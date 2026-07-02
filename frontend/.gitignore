@@ -1,0 +1,17 @@
+# Dependencies
+/node_modules
+
+# Build output
+/dist
+/out-tsc
+/tmp
+
+# Angular / IDE
+.angular/
+.vscode/
+.idea/
+*.log
+
+# System
+.DS_Store
+Thumbs.db

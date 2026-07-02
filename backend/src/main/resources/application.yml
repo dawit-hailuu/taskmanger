@@ -1,0 +1,37 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: task-manager
+
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:task_manager}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update          # auto-creates/updates tables from entities on startup
+    show-sql: true
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
+
+# Application-specific security settings
+app:
+  jwt:
+    # Base64-encoded 256-bit secret. Override in production via env var APP_JWT_SECRET.
+    secret: ${APP_JWT_SECRET:c2VjdXJlLXRhc2stbWFuYWdlci1qd3Qtc2VjcmV0LWtleS1jaGFuZ2UtaW4tcHJvZHVjdGlvbi0yMDI2}
+    # Access token lifetime in milliseconds (default 24h)
+    expiration-ms: ${APP_JWT_EXPIRATION_MS:86400000}
+  cors:
+    allowed-origins: ${APP_CORS_ORIGINS:http://localhost:4200}
+
+logging:
+  level:
+    org.springframework.security: INFO
+    com.taskmanager: DEBUG
