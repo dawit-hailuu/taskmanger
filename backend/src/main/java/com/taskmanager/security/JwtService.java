@@ -1,5 +1,6 @@
 package com.taskmanager.security;
 
+import com.taskmanager.user.User;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -10,35 +11,45 @@ import org.springframework.stereotype.Service;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.Map;
 import java.util.function.Function;
 
 /**
- * Issues and verifies HMAC-signed JWTs. The subject of each token is the
- * user's email (their Spring Security username).
+ * Issues and verifies short-lived, HMAC-signed access tokens. The subject is
+ * the user's email; {@code uid} and {@code role} claims let downstream code
+ * read identity without a database hit. Long-lived sessions are handled
+ * separately by rotating refresh tokens (see {@code RefreshTokenService}).
  */
 @Service
 public class JwtService {
 
     private final SecretKey signingKey;
-    private final long expirationMs;
+    private final long accessExpirationMs;
 
     public JwtService(
             @Value("${app.jwt.secret}") String secret,
-            @Value("${app.jwt.expiration-ms}") long expirationMs) {
+            @Value("${app.jwt.access-expiration-ms}") long accessExpirationMs) {
         this.signingKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
-        this.expirationMs = expirationMs;
+        this.accessExpirationMs = accessExpirationMs;
     }
 
-    public String generateToken(UserDetails userDetails) {
+    public String generateAccessToken(User user) {
         Date now = new Date();
-        Date expiry = new Date(now.getTime() + expirationMs);
+        Date expiry = new Date(now.getTime() + accessExpirationMs);
 
         return Jwts.builder()
-                .subject(userDetails.getUsername())
+                .subject(user.getUsername())
+                .claims(Map.of(
+                        "uid", user.getId(),
+                        "role", user.getRole().name()))
                 .issuedAt(now)
                 .expiration(expiry)
                 .signWith(signingKey)
                 .compact();
+    }
+
+    public long getAccessExpirationMs() {
+        return accessExpirationMs;
     }
 
     public String extractUsername(String token) {

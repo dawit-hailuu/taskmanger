@@ -1,7 +1,10 @@
 package com.taskmanager.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskmanager.security.JwtAuthenticationEntryPoint;
 import com.taskmanager.security.JwtAuthenticationFilter;
+import com.taskmanager.security.ratelimit.RateLimiter;
+import com.taskmanager.security.ratelimit.RateLimitingFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -32,16 +35,22 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final JwtAuthenticationEntryPoint authenticationEntryPoint;
     private final UserDetailsService userDetailsService;
+    private final RateLimiter rateLimiter;
+    private final ObjectMapper objectMapper;
 
     @Value("${app.cors.allowed-origins}")
     private String allowedOrigins;
 
     public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
                           JwtAuthenticationEntryPoint authenticationEntryPoint,
-                          UserDetailsService userDetailsService) {
+                          UserDetailsService userDetailsService,
+                          RateLimiter rateLimiter,
+                          ObjectMapper objectMapper) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.authenticationEntryPoint = authenticationEntryPoint;
         this.userDetailsService = userDetailsService;
+        this.rateLimiter = rateLimiter;
+        this.objectMapper = objectMapper;
     }
 
     @Bean
@@ -52,6 +61,14 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
+                        // Interactive API docs
+                        .requestMatchers(
+                                "/swagger-ui.html",
+                                "/swagger-ui/**",
+                                "/v3/api-docs",
+                                "/v3/api-docs/**").permitAll()
+                        // Uploaded assets (avatars, attachments) are plain static files.
+                        .requestMatchers("/uploads/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session
@@ -59,7 +76,10 @@ public class SecurityConfig {
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(authenticationEntryPoint))
                 .authenticationProvider(authenticationProvider())
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                // Throttle abuse-prone auth endpoints before any auth work happens.
+                .addFilterBefore(new RateLimitingFilter(rateLimiter, objectMapper),
+                        JwtAuthenticationFilter.class);
 
         return http.build();
     }

@@ -6,6 +6,7 @@ import {
   signal,
 } from '@angular/core';
 import { NgClass } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { TaskService } from '../../core/services/task.service';
 import {
   PRIORITY_LABELS,
@@ -16,13 +17,14 @@ import {
   Task,
   TaskRequest,
   TaskStatus,
+  TERMINAL_STATUSES,
 } from '../../core/models/task.model';
 import { TaskFormComponent } from './task-form.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [NgClass, TaskFormComponent],
+  imports: [NgClass, RouterLink, TaskFormComponent],
   template: `
     <main class="container page">
       <section class="page-head">
@@ -125,7 +127,9 @@ import { TaskFormComponent } from './task-form.component';
                 </span>
               </div>
 
-              <h3 class="task-title">{{ task.title }}</h3>
+              <h3 class="task-title">
+                <a [routerLink]="['/tasks', task.id]">{{ task.title }}</a>
+              </h3>
 
               @if (task.description) {
                 <p class="task-desc">{{ task.description }}</p>
@@ -291,6 +295,7 @@ import { TaskFormComponent } from './task-form.component';
       .spine-low { border-left-color: var(--low); }
       .spine-med { border-left-color: var(--med); }
       .spine-high { border-left-color: var(--high); }
+      .spine-urgent { border-left-color: var(--urgent); border-left-width: 5px; }
 
       .task-top {
         display: flex;
@@ -301,6 +306,15 @@ import { TaskFormComponent } from './task-form.component';
       .task-title {
         font-size: 1.05rem;
         line-height: 1.35;
+      }
+
+      .task-title a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .task-title a:hover {
+        text-decoration: underline;
       }
 
       .task-desc {
@@ -548,18 +562,30 @@ export class DashboardComponent implements OnInit {
   }
 
   spineClass(p: Priority): string {
-    return { LOW: 'spine-low', MEDIUM: 'spine-med', HIGH: 'spine-high' }[p];
+    return {
+      LOW: 'spine-low',
+      MEDIUM: 'spine-med',
+      HIGH: 'spine-high',
+      URGENT: 'spine-urgent',
+    }[p];
   }
 
   priorityBadgeClass(p: Priority): string {
-    return { LOW: 'badge-low', MEDIUM: 'badge-med', HIGH: 'badge-high' }[p];
+    return {
+      LOW: 'badge-low',
+      MEDIUM: 'badge-med',
+      HIGH: 'badge-high',
+      URGENT: 'badge-urgent',
+    }[p];
   }
 
   statusBadgeClass(s: TaskStatus): string {
     return {
       TODO: 'badge-todo',
       IN_PROGRESS: 'badge-progress',
-      DONE: 'badge-done',
+      REVIEW: 'badge-review',
+      COMPLETED: 'badge-done',
+      CANCELLED: 'badge-cancelled',
     }[s];
   }
 
@@ -573,7 +599,7 @@ export class DashboardComponent implements OnInit {
   }
 
   isOverdue(task: Task): boolean {
-    if (!task.dueDate || task.status === 'DONE') {
+    if (!task.dueDate || TERMINAL_STATUSES.includes(task.status)) {
       return false;
     }
     const today = new Date();

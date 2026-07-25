@@ -188,6 +188,8 @@ export class TaskFormComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
 
   readonly task = input<Task | null>(null);
+  /** When set, new tasks created from this form are attached to this project. */
+  readonly projectId = input<number | null>(null);
   readonly saved = output<TaskRequest>();
   readonly cancelled = output<void>();
 
@@ -239,12 +241,14 @@ export class TaskFormComponent implements OnInit {
     }
 
     const raw = this.form.getRawValue();
+    const existing = this.task();
     const payload: TaskRequest = {
       title: raw.title.trim(),
       description: raw.description.trim() ? raw.description.trim() : null,
       priority: raw.priority,
       status: raw.status,
       dueDate: raw.dueDate ? raw.dueDate : null,
+      projectId: existing ? existing.projectId : this.projectId(),
     };
     this.saved.emit(payload);
   }

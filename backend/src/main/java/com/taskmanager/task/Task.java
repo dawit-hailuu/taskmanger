@@ -1,5 +1,6 @@
 package com.taskmanager.task;
 
+import com.taskmanager.project.Project;
 import com.taskmanager.user.User;
 import jakarta.persistence.*;
 import org.springframework.data.annotation.CreatedDate;
@@ -16,7 +17,8 @@ import java.time.LocalDate;
                 @Index(name = "idx_tasks_user", columnList = "user_id"),
                 @Index(name = "idx_tasks_status", columnList = "status"),
                 @Index(name = "idx_tasks_priority", columnList = "priority"),
-                @Index(name = "idx_tasks_due_date", columnList = "due_date")
+                @Index(name = "idx_tasks_due_date", columnList = "due_date"),
+                @Index(name = "idx_tasks_project", columnList = "project_id")
         }
 )
 @EntityListeners(AuditingEntityListener.class)
@@ -43,10 +45,31 @@ public class Task {
     @Column(name = "due_date")
     private LocalDate dueDate;
 
+    @Column(name = "start_date")
+    private LocalDate startDate;
+
+    @Column(name = "estimated_minutes")
+    private Integer estimatedMinutes;
+
+    @Column(name = "actual_minutes", nullable = false)
+    private int actualMinutes = 0;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private RecurrenceType recurrence = RecurrenceType.NONE;
+
+    @Column(name = "recurrence_end_date")
+    private LocalDate recurrenceEndDate;
+
     /** Owner of the task. Tasks are scoped per-user. */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false, foreignKey = @ForeignKey(name = "fk_tasks_user"))
     private User user;
+
+    /** Optional project this task belongs to. Null for personal, unfiled tasks. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "project_id", foreignKey = @ForeignKey(name = "fk_tasks_project"))
+    private Project project;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -122,8 +145,26 @@ public class Task {
     public LocalDate getDueDate() { return dueDate; }
     public void setDueDate(LocalDate dueDate) { this.dueDate = dueDate; }
 
+    public LocalDate getStartDate() { return startDate; }
+    public void setStartDate(LocalDate startDate) { this.startDate = startDate; }
+
+    public Integer getEstimatedMinutes() { return estimatedMinutes; }
+    public void setEstimatedMinutes(Integer estimatedMinutes) { this.estimatedMinutes = estimatedMinutes; }
+
+    public int getActualMinutes() { return actualMinutes; }
+    public void setActualMinutes(int actualMinutes) { this.actualMinutes = actualMinutes; }
+
+    public RecurrenceType getRecurrence() { return recurrence; }
+    public void setRecurrence(RecurrenceType recurrence) { this.recurrence = recurrence; }
+
+    public LocalDate getRecurrenceEndDate() { return recurrenceEndDate; }
+    public void setRecurrenceEndDate(LocalDate recurrenceEndDate) { this.recurrenceEndDate = recurrenceEndDate; }
+
     public User getUser() { return user; }
     public void setUser(User user) { this.user = user; }
+
+    public Project getProject() { return project; }
+    public void setProject(Project project) { this.project = project; }
 
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }

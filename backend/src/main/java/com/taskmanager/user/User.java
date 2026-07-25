@@ -37,6 +37,15 @@ public class User implements UserDetails {
     @Column(nullable = false, length = 20)
     private Role role = Role.ROLE_USER;
 
+    /** Lifecycle state of the account. Login is refused unless ACTIVE-eligible. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "account_status", nullable = false, length = 20)
+    private AccountStatus accountStatus = AccountStatus.PENDING;
+
+    /** Whether the user has confirmed ownership of their email address. */
+    @Column(name = "email_verified", nullable = false)
+    private boolean emailVerified = false;
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -44,12 +53,15 @@ public class User implements UserDetails {
     public User() {
     }
 
-    public User(Long id, String name, String email, String password, Role role, Instant createdAt) {
+    public User(Long id, String name, String email, String password, Role role,
+                AccountStatus accountStatus, boolean emailVerified, Instant createdAt) {
         this.id = id;
         this.name = name;
         this.email = email;
         this.password = password;
         this.role = (role != null) ? role : Role.ROLE_USER;
+        this.accountStatus = (accountStatus != null) ? accountStatus : AccountStatus.PENDING;
+        this.emailVerified = emailVerified;
         this.createdAt = createdAt;
     }
 
@@ -63,6 +75,8 @@ public class User implements UserDetails {
         private String email;
         private String password;
         private Role role = Role.ROLE_USER;
+        private AccountStatus accountStatus = AccountStatus.PENDING;
+        private boolean emailVerified = false;
         private Instant createdAt;
 
         public Builder id(Long id) { this.id = id; return this; }
@@ -70,10 +84,12 @@ public class User implements UserDetails {
         public Builder email(String email) { this.email = email; return this; }
         public Builder password(String password) { this.password = password; return this; }
         public Builder role(Role role) { this.role = role; return this; }
+        public Builder accountStatus(AccountStatus accountStatus) { this.accountStatus = accountStatus; return this; }
+        public Builder emailVerified(boolean emailVerified) { this.emailVerified = emailVerified; return this; }
         public Builder createdAt(Instant createdAt) { this.createdAt = createdAt; return this; }
 
         public User build() {
-            return new User(id, name, email, password, role, createdAt);
+            return new User(id, name, email, password, role, accountStatus, emailVerified, createdAt);
         }
     }
 
@@ -92,6 +108,12 @@ public class User implements UserDetails {
 
     public Role getRole() { return role; }
     public void setRole(Role role) { this.role = role; }
+
+    public boolean isEmailVerified() { return emailVerified; }
+    public void setEmailVerified(boolean emailVerified) { this.emailVerified = emailVerified; }
+
+    public AccountStatus getAccountStatus() { return accountStatus; }
+    public void setAccountStatus(AccountStatus accountStatus) { this.accountStatus = accountStatus; }
 
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
@@ -129,8 +151,14 @@ public class User implements UserDetails {
         return true;
     }
 
+    /**
+     * A DEACTIVATED account is disabled for Spring Security (→ DisabledException).
+     * PENDING accounts remain "enabled" here so that authentication succeeds and
+     * the login flow can raise a distinct, actionable EMAIL_NOT_VERIFIED error
+     * instead of a generic disabled message.
+     */
     @Override
     public boolean isEnabled() {
-        return true;
+        return accountStatus != AccountStatus.DEACTIVATED;
     }
 }

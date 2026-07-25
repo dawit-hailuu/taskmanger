@@ -31,14 +31,20 @@
   --med-tint: #fdf2df;
   --high: #ef4444;
   --high-tint: #fdeaea;
+  --urgent: #b91c1c;
+  --urgent-tint: #fbe3e3;
 
   /* Status */
   --todo: #6b7688;
   --todo-tint: #eef0f4;
   --progress: #3d4ee0;
   --progress-tint: #eceffd;
+  --review: #9333ea;
+  --review-tint: #f3e8ff;
   --done: #10b981;
   --done-tint: #e6f7f1;
+  --cancelled: #6b7688;
+  --cancelled-tint: #eef0f4;
 
   --danger: #dc2626;
 
@@ -237,10 +243,13 @@ a:hover {
 .badge-low { color: var(--low); background: var(--low-tint); }
 .badge-med { color: #b76e00; background: var(--med-tint); }
 .badge-high { color: var(--high); background: var(--high-tint); }
+.badge-urgent { color: var(--urgent); background: var(--urgent-tint); }
 
 .badge-todo { color: var(--todo); background: var(--todo-tint); }
 .badge-progress { color: var(--progress); background: var(--progress-tint); }
+.badge-review { color: var(--review); background: var(--review-tint); }
 .badge-done { color: #0a7a58; background: var(--done-tint); }
+.badge-cancelled { color: var(--cancelled); background: var(--cancelled-tint); text-decoration: line-through; }
 
 /* ---------- Cards ---------- */
 .card {
@@ -248,6 +257,108 @@ a:hover {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
+}
+
+/* ---------- Auth layout (shared by all auth pages) ---------- */
+.auth {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.25rem;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 400px;
+  padding: 2.2rem;
+}
+
+.auth-head {
+  text-align: center;
+  margin-bottom: 1.6rem;
+}
+
+.auth-head h1 {
+  font-size: 1.5rem;
+}
+
+.brand-mark {
+  display: inline-flex;
+  gap: 4px;
+  align-items: flex-end;
+  height: 26px;
+  margin-bottom: 1rem;
+}
+.brand-mark .tick { width: 5px; border-radius: 2px; display: block; }
+.brand-mark .tick-high { height: 26px; background: var(--high); }
+.brand-mark .tick-med { height: 18px; background: var(--med); }
+.brand-mark .tick-low { height: 11px; background: var(--low); }
+
+.auth .sub {
+  color: var(--muted);
+  margin: 0.4rem 0 0;
+  font-size: 0.92rem;
+}
+
+.auth form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.auth .switch {
+  text-align: center;
+  margin: 1.4rem 0 0;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+/* ---------- Alerts ---------- */
+.alert {
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 0.9rem;
+  font-size: 0.86rem;
+  margin-bottom: 1.1rem;
+}
+.alert-error {
+  background: var(--high-tint);
+  color: var(--high);
+  border: 1px solid var(--high);
+}
+.alert-success {
+  background: var(--low-tint);
+  color: #0a7a58;
+  border: 1px solid var(--low);
+}
+.alert-info {
+  background: var(--brand-tint);
+  color: var(--brand-strong);
+  border: 1px solid var(--brand);
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+  color: var(--ink-2);
+}
+.checkbox-row input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--brand);
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--brand);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
 }
 
 /* ---------- Utility ---------- */

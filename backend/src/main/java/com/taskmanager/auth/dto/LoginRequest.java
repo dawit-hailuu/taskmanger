@@ -10,6 +10,9 @@ public record LoginRequest(
         String email,
 
         @NotBlank(message = "Password is required")
-        String password
+        String password,
+
+        /** When true, the refresh token is issued with an extended lifetime. */
+        boolean rememberMe
 ) {
 }

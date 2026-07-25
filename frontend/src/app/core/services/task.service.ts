@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { Page, Task, TaskQuery, TaskRequest } from '../models/task.model';
+import { Page, Task, TaskHistoryEntry, TaskQuery, TaskRequest } from '../models/task.model';
 
 @Injectable({ providedIn: 'root' })
 export class TaskService {
@@ -44,5 +44,10 @@ export class TaskService {
 
   delete(id: number): Observable<void> {
     return this.http.delete<void>(`${this.baseUrl}/${id}`);
+  }
+
+  history(id: number, page = 0, size = 20): Observable<Page<TaskHistoryEntry>> {
+    const params = new HttpParams().set('page', String(page)).set('size', String(size));
+    return this.http.get<Page<TaskHistoryEntry>>(`${this.baseUrl}/${id}/history`, { params });
   }
 }

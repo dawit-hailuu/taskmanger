@@ -1,9 +1,12 @@
-import { Component, inject } from '@angular/core';
+import { Component, OnInit, computed, inject } from '@angular/core';
+import { RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
+import { ProfileService } from '../../core/services/profile.service';
 
 @Component({
   selector: 'app-navbar',
   standalone: true,
+  imports: [RouterLink, RouterLinkActive],
   template: `
     <header class="nav">
       <div class="container nav-inner">
@@ -17,12 +20,25 @@ import { AuthService } from '../../core/services/auth.service';
         </div>
 
         @if (user(); as u) {
+          <nav class="links">
+            <a routerLink="/dashboard" routerLinkActive="active">Dashboard</a>
+            <a routerLink="/workspaces" routerLinkActive="active">Workspaces</a>
+            <a routerLink="/profile" routerLinkActive="active">Profile</a>
+            <a routerLink="/settings" routerLinkActive="active">Settings</a>
+          </nav>
+
           <div class="account">
             <div class="who">
               <span class="who-name">{{ u.name }}</span>
               <span class="who-email">{{ u.email }}</span>
             </div>
-            <span class="avatar" aria-hidden="true">{{ initial(u.name) }}</span>
+            <a routerLink="/profile" class="avatar-link" aria-label="View profile">
+              @if (avatarUrl(); as url) {
+                <img [src]="url" alt="" class="avatar-img" />
+              } @else {
+                <span class="avatar" aria-hidden="true">{{ initial(u.name) }}</span>
+              }
+            </a>
             <button type="button" class="btn btn-ghost" (click)="logout()">
               Sign out
             </button>
@@ -46,6 +62,7 @@ import { AuthService } from '../../core/services/auth.service';
         display: flex;
         align-items: center;
         justify-content: space-between;
+        gap: 1.2rem;
         height: 62px;
       }
 
@@ -53,6 +70,7 @@ import { AuthService } from '../../core/services/auth.service';
         display: flex;
         align-items: center;
         gap: 0.6rem;
+        flex-shrink: 0;
       }
 
       .brand-mark {
@@ -78,10 +96,29 @@ import { AuthService } from '../../core/services/auth.service';
         letter-spacing: -0.02em;
       }
 
+      .links {
+        display: flex;
+        gap: 1.4rem;
+        flex: 1;
+      }
+
+      .links a {
+        color: var(--muted);
+        font-size: 0.9rem;
+        font-weight: 600;
+        text-decoration: none;
+      }
+
+      .links a:hover,
+      .links a.active {
+        color: var(--brand);
+      }
+
       .account {
         display: flex;
         align-items: center;
         gap: 0.85rem;
+        flex-shrink: 0;
       }
 
       .who {
@@ -101,10 +138,22 @@ import { AuthService } from '../../core/services/auth.service';
         color: var(--muted);
       }
 
-      .avatar {
+      .avatar-link {
+        display: inline-flex;
+      }
+
+      .avatar,
+      .avatar-img {
         width: 34px;
         height: 34px;
         border-radius: 50%;
+      }
+
+      .avatar-img {
+        object-fit: cover;
+      }
+
+      .avatar {
         background: var(--brand-tint);
         color: var(--brand-strong);
         display: inline-flex;
@@ -112,6 +161,12 @@ import { AuthService } from '../../core/services/auth.service';
         justify-content: center;
         font-weight: 700;
         font-size: 0.9rem;
+      }
+
+      @media (max-width: 720px) {
+        .links {
+          display: none;
+        }
       }
 
       @media (max-width: 520px) {
@@ -122,9 +177,18 @@ import { AuthService } from '../../core/services/auth.service';
     `,
   ],
 })
-export class NavbarComponent {
+export class NavbarComponent implements OnInit {
   private readonly auth = inject(AuthService);
+  private readonly profileService = inject(ProfileService);
+
   readonly user = this.auth.user;
+  readonly avatarUrl = computed(() => this.profileService.profile()?.avatarUrl ?? null);
+
+  ngOnInit(): void {
+    if (this.auth.isAuthenticated() && !this.profileService.profile()) {
+      this.profileService.get().subscribe({ error: () => undefined });
+    }
+  }
 
   logout(): void {
     this.auth.logout();

@@ -12,6 +12,8 @@ public record ApiError(
         int status,
         String error,
         String message,
+        /** Optional machine-readable code (e.g. EMAIL_NOT_VERIFIED) for clients to branch on. */
+        String code,
         String path,
         List<FieldValidationError> fieldErrors
 ) {
@@ -19,11 +21,15 @@ public record ApiError(
     }
 
     public static ApiError of(int status, String error, String message, String path) {
-        return new ApiError(Instant.now(), status, error, message, path, null);
+        return new ApiError(Instant.now(), status, error, message, null, path, null);
+    }
+
+    public static ApiError of(int status, String error, String message, String code, String path) {
+        return new ApiError(Instant.now(), status, error, message, code, path, null);
     }
 
     public static ApiError of(int status, String error, String message, String path,
                               List<FieldValidationError> fieldErrors) {
-        return new ApiError(Instant.now(), status, error, message, path, fieldErrors);
+        return new ApiError(Instant.now(), status, error, message, null, path, fieldErrors);
     }
 }

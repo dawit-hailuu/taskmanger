@@ -2,9 +2,9 @@ import { HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { AuthService } from '../services/auth.service';
 
-/** Attaches `Authorization: Bearer <token>` to outgoing API requests. */
+/** Attaches `Authorization: Bearer <accessToken>` to outgoing API requests. */
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
-  const token = inject(AuthService).getToken();
+  const token = inject(AuthService).getAccessToken();
 
   if (token) {
     req = req.clone({

@@ -1,11 +1,8 @@
 import { Component, inject, signal } from '@angular/core';
-import {
-  FormBuilder,
-  ReactiveFormsModule,
-  Validators,
-} from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
+import { ApiClientError } from '../../../core/models/api-error';
 
 @Component({
   selector: 'app-register',
@@ -20,148 +17,80 @@ import { AuthService } from '../../../core/services/auth.service';
             <span class="tick tick-med"></span>
             <span class="tick tick-low"></span>
           </span>
-          <h1>Create your account</h1>
-          <p class="sub">Start organizing your work in a minute.</p>
+          @if (registeredEmail()) {
+            <h1>Check your email</h1>
+            <p class="sub">One more step to activate your account.</p>
+          } @else {
+            <h1>Create your account</h1>
+            <p class="sub">Start organizing your work in a minute.</p>
+          }
         </div>
 
-        @if (error()) {
-          <div class="alert" role="alert">{{ error() }}</div>
-        }
-
-        <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
-          <div class="field">
-            <label class="label" for="name">Name</label>
-            <input
-              id="name"
-              type="text"
-              class="input"
-              formControlName="name"
-              placeholder="Your name"
-              autocomplete="name"
-            />
-            @if (invalid('name')) {
-              <span class="error-text">Name must be at least 2 characters.</span>
-            }
+        @if (registeredEmail(); as email) {
+          <div class="alert alert-success" role="status">
+            We've sent a verification link to <strong>{{ email }}</strong>.
+            Click it to activate your account, then sign in.
           </div>
-
-          <div class="field">
-            <label class="label" for="email">Email</label>
-            <input
-              id="email"
-              type="email"
-              class="input"
-              formControlName="email"
-              placeholder="you@example.com"
-              autocomplete="email"
-            />
-            @if (invalid('email')) {
-              <span class="error-text">Enter a valid email address.</span>
-            }
-          </div>
-
-          <div class="field">
-            <label class="label" for="password">Password</label>
-            <input
-              id="password"
-              type="password"
-              class="input"
-              formControlName="password"
-              placeholder="At least 6 characters"
-              autocomplete="new-password"
-            />
-            @if (invalid('password')) {
-              <span class="error-text">Password must be at least 6 characters.</span>
-            }
-          </div>
-
-          <button
-            type="submit"
-            class="btn btn-primary btn-block"
-            [disabled]="loading()"
-          >
-            {{ loading() ? 'Creating account…' : 'Create account' }}
+          @if (info()) {
+            <div class="alert alert-info" role="status">{{ info() }}</div>
+          }
+          <button type="button" class="btn btn-ghost btn-block" (click)="resend()" [disabled]="resending()">
+            {{ resending() ? 'Sending…' : "Didn't get it? Resend email" }}
           </button>
-        </form>
+          <p class="switch">Already verified? <a routerLink="/login">Sign in</a></p>
+        } @else {
+          @if (error()) {
+            <div class="alert alert-error" role="alert">{{ error() }}</div>
+          }
 
-        <p class="switch">
-          Already have an account? <a routerLink="/login">Sign in</a>
-        </p>
+          <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+            <div class="field">
+              <label class="label" for="name">Name</label>
+              <input id="name" type="text" class="input" formControlName="name"
+                     placeholder="Your name" autocomplete="name" />
+              @if (invalid('name')) {
+                <span class="error-text">Name must be at least 2 characters.</span>
+              }
+            </div>
+
+            <div class="field">
+              <label class="label" for="email">Email</label>
+              <input id="email" type="email" class="input" formControlName="email"
+                     placeholder="you@example.com" autocomplete="email" />
+              @if (invalid('email')) {
+                <span class="error-text">Enter a valid email address.</span>
+              }
+            </div>
+
+            <div class="field">
+              <label class="label" for="password">Password</label>
+              <input id="password" type="password" class="input" formControlName="password"
+                     placeholder="At least 6 characters" autocomplete="new-password" />
+              @if (invalid('password')) {
+                <span class="error-text">Password must be at least 6 characters.</span>
+              }
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block" [disabled]="loading()">
+              {{ loading() ? 'Creating account…' : 'Create account' }}
+            </button>
+          </form>
+
+          <p class="switch">Already have an account? <a routerLink="/login">Sign in</a></p>
+        }
       </section>
     </main>
   `,
-  styles: [
-    `
-      .auth {
-        min-height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 2rem 1.25rem;
-      }
-
-      .auth-card {
-        width: 100%;
-        max-width: 400px;
-        padding: 2.2rem;
-      }
-
-      .auth-head {
-        text-align: center;
-        margin-bottom: 1.6rem;
-      }
-
-      .brand-mark {
-        display: inline-flex;
-        gap: 4px;
-        align-items: flex-end;
-        height: 26px;
-        margin-bottom: 1rem;
-      }
-      .tick { width: 5px; border-radius: 2px; display: block; }
-      .tick-high { height: 26px; background: var(--high); }
-      .tick-med { height: 18px; background: var(--med); }
-      .tick-low { height: 11px; background: var(--low); }
-
-      h1 { font-size: 1.5rem; }
-
-      .sub {
-        color: var(--muted);
-        margin: 0.4rem 0 0;
-        font-size: 0.92rem;
-      }
-
-      form {
-        display: flex;
-        flex-direction: column;
-        gap: 1.1rem;
-      }
-
-      .alert {
-        background: var(--high-tint);
-        color: var(--high);
-        border: 1px solid var(--high);
-        border-radius: var(--radius-sm);
-        padding: 0.7rem 0.85rem;
-        font-size: 0.85rem;
-        margin-bottom: 1.1rem;
-      }
-
-      .switch {
-        text-align: center;
-        margin: 1.4rem 0 0;
-        font-size: 0.88rem;
-        color: var(--muted);
-      }
-    `,
-  ],
 })
 export class RegisterComponent {
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
-  private readonly router = inject(Router);
 
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
+  readonly info = signal<string | null>(null);
+  readonly registeredEmail = signal<string | null>(null);
+  readonly resending = signal(false);
 
   readonly form = this.fb.nonNullable.group({
     name: ['', [Validators.required, Validators.minLength(2)]],
@@ -183,13 +112,34 @@ export class RegisterComponent {
     this.loading.set(true);
     this.error.set(null);
 
+    const email = this.form.controls.email.value;
     this.auth.register(this.form.getRawValue()).subscribe({
       next: () => {
-        void this.router.navigate(['/dashboard']);
+        this.loading.set(false);
+        this.registeredEmail.set(email);
       },
-      error: (err: Error) => {
+      error: (err: ApiClientError) => {
         this.error.set(err.message);
         this.loading.set(false);
+      },
+    });
+  }
+
+  resend(): void {
+    const email = this.registeredEmail();
+    if (!email) {
+      return;
+    }
+    this.resending.set(true);
+    this.info.set(null);
+    this.auth.resendVerification(email).subscribe({
+      next: (res) => {
+        this.resending.set(false);
+        this.info.set(res.message);
+      },
+      error: (err: ApiClientError) => {
+        this.resending.set(false);
+        this.error.set(err.message);
       },
     });
   }

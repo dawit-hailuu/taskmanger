@@ -1,7 +1,9 @@
 package com.taskmanager.task.dto;
 
 import com.taskmanager.task.Priority;
+import com.taskmanager.task.RecurrenceType;
 import com.taskmanager.task.TaskStatus;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -27,6 +29,21 @@ public record TaskRequest(
         @NotNull(message = "Status is required")
         TaskStatus status,
 
-        LocalDate dueDate
+        LocalDate startDate,
+
+        LocalDate dueDate,
+
+        @Min(value = 0, message = "Estimated minutes cannot be negative")
+        Integer estimatedMinutes,
+
+        @Min(value = 0, message = "Actual minutes cannot be negative")
+        Integer actualMinutes,
+
+        RecurrenceType recurrence,
+
+        LocalDate recurrenceEndDate,
+
+        /** Optional project this task belongs to. Null keeps it a personal, unfiled task. */
+        Long projectId
 ) {
 }

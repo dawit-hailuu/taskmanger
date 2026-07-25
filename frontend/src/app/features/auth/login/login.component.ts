@@ -1,11 +1,8 @@
 import { Component, inject, signal } from '@angular/core';
-import {
-  FormBuilder,
-  ReactiveFormsModule,
-  Validators,
-} from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
+import { ApiClientError } from '../../../core/models/api-error';
 
 @Component({
   selector: 'app-login',
@@ -25,7 +22,20 @@ import { AuthService } from '../../../core/services/auth.service';
         </div>
 
         @if (error()) {
-          <div class="alert" role="alert">{{ error() }}</div>
+          <div class="alert alert-error" role="alert">
+            {{ error() }}
+            @if (needsVerification()) {
+              <div style="margin-top:.6rem;">
+                <button type="button" class="link-btn" (click)="resend()" [disabled]="resending()">
+                  {{ resending() ? 'Sending…' : 'Resend verification email' }}
+                </button>
+              </div>
+            }
+          </div>
+        }
+
+        @if (info()) {
+          <div class="alert alert-info" role="status">{{ info() }}</div>
         }
 
         <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
@@ -59,83 +69,31 @@ import { AuthService } from '../../../core/services/auth.service';
             }
           </div>
 
-          <button
-            type="submit"
-            class="btn btn-primary btn-block"
-            [disabled]="loading()"
-          >
+          <div class="row-between">
+            <label class="checkbox-row">
+              <input type="checkbox" formControlName="rememberMe" />
+              Remember me
+            </label>
+            <a routerLink="/forgot-password">Forgot password?</a>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-block" [disabled]="loading()">
             {{ loading() ? 'Signing in…' : 'Sign in' }}
           </button>
         </form>
 
-        <p class="switch">
-          New here? <a routerLink="/register">Create an account</a>
-        </p>
+        <p class="switch">New here? <a routerLink="/register">Create an account</a></p>
       </section>
     </main>
   `,
   styles: [
     `
-      .auth {
-        min-height: 100vh;
+      .row-between {
         display: flex;
         align-items: center;
-        justify-content: center;
-        padding: 2rem 1.25rem;
-      }
-
-      .auth-card {
-        width: 100%;
-        max-width: 400px;
-        padding: 2.2rem;
-      }
-
-      .auth-head {
-        text-align: center;
-        margin-bottom: 1.6rem;
-      }
-
-      .brand-mark {
-        display: inline-flex;
-        gap: 4px;
-        align-items: flex-end;
-        height: 26px;
-        margin-bottom: 1rem;
-      }
-      .tick { width: 5px; border-radius: 2px; display: block; }
-      .tick-high { height: 26px; background: var(--high); }
-      .tick-med { height: 18px; background: var(--med); }
-      .tick-low { height: 11px; background: var(--low); }
-
-      h1 { font-size: 1.5rem; }
-
-      .sub {
-        color: var(--muted);
-        margin: 0.4rem 0 0;
-        font-size: 0.92rem;
-      }
-
-      form {
-        display: flex;
-        flex-direction: column;
-        gap: 1.1rem;
-      }
-
-      .alert {
-        background: var(--high-tint);
-        color: var(--high);
-        border: 1px solid var(--high);
-        border-radius: var(--radius-sm);
-        padding: 0.7rem 0.85rem;
+        justify-content: space-between;
+        gap: 0.75rem;
         font-size: 0.85rem;
-        margin-bottom: 1.1rem;
-      }
-
-      .switch {
-        text-align: center;
-        margin: 1.4rem 0 0;
-        font-size: 0.88rem;
-        color: var(--muted);
       }
     `,
   ],
@@ -147,10 +105,14 @@ export class LoginComponent {
 
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
+  readonly info = signal<string | null>(null);
+  readonly needsVerification = signal(false);
+  readonly resending = signal(false);
 
   readonly form = this.fb.nonNullable.group({
     email: ['', [Validators.required, Validators.email]],
     password: ['', [Validators.required]],
+    rememberMe: [false],
   });
 
   invalid(control: 'email' | 'password'): boolean {
@@ -166,14 +128,37 @@ export class LoginComponent {
 
     this.loading.set(true);
     this.error.set(null);
+    this.info.set(null);
+    this.needsVerification.set(false);
 
     this.auth.login(this.form.getRawValue()).subscribe({
       next: () => {
         void this.router.navigate(['/dashboard']);
       },
-      error: (err: Error) => {
+      error: (err: ApiClientError) => {
         this.error.set(err.message);
+        this.needsVerification.set(err.code === 'EMAIL_NOT_VERIFIED');
         this.loading.set(false);
+      },
+    });
+  }
+
+  resend(): void {
+    const email = this.form.controls.email.value;
+    if (!email) {
+      return;
+    }
+    this.resending.set(true);
+    this.auth.resendVerification(email).subscribe({
+      next: (res) => {
+        this.resending.set(false);
+        this.needsVerification.set(false);
+        this.error.set(null);
+        this.info.set(res.message);
+      },
+      error: (err: ApiClientError) => {
+        this.resending.set(false);
+        this.error.set(err.message);
       },
     });
   }
