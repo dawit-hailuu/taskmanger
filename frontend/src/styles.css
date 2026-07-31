@@ -60,6 +60,56 @@
   --font-body: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
+:root[data-theme='dark'] {
+  /* Surfaces */
+  --bg: #12141c;
+  --bg-grid: #1a1d28;
+  --surface: #1a1d28;
+  --surface-2: #20232f;
+  --border: #2a2e3d;
+  --border-strong: #3a3f52;
+
+  /* Ink */
+  --ink: #e8eaf0;
+  --ink-2: #c2c7d6;
+  --muted: #8b93a7;
+  --faint: #626a7d;
+
+  /* Brand */
+  --brand: #6f7ef7;
+  --brand-strong: #8b98fa;
+  --brand-tint: #262b52;
+  --brand-ink: #ffffff;
+
+  /* Priority */
+  --low: #34d399;
+  --low-tint: #123528;
+  --med: #fbbf24;
+  --med-tint: #3a2c0d;
+  --high: #f87171;
+  --high-tint: #3d1616;
+  --urgent: #ef4444;
+  --urgent-tint: #451414;
+
+  /* Status */
+  --todo: #8b93a7;
+  --todo-tint: #23273350;
+  --progress: #6f7ef7;
+  --progress-tint: #262b52;
+  --review: #c084fc;
+  --review-tint: #33204a;
+  --done: #34d399;
+  --done-tint: #123528;
+  --cancelled: #8b93a7;
+  --cancelled-tint: #23273350;
+
+  --danger: #f87171;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.55);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -241,14 +291,14 @@ a:hover {
 }
 
 .badge-low { color: var(--low); background: var(--low-tint); }
-.badge-med { color: #b76e00; background: var(--med-tint); }
+.badge-med { color: var(--med); background: var(--med-tint); }
 .badge-high { color: var(--high); background: var(--high-tint); }
 .badge-urgent { color: var(--urgent); background: var(--urgent-tint); }
 
 .badge-todo { color: var(--todo); background: var(--todo-tint); }
 .badge-progress { color: var(--progress); background: var(--progress-tint); }
 .badge-review { color: var(--review); background: var(--review-tint); }
-.badge-done { color: #0a7a58; background: var(--done-tint); }
+.badge-done { color: var(--done); background: var(--done-tint); }
 .badge-cancelled { color: var(--cancelled); background: var(--cancelled-tint); text-decoration: line-through; }
 
 /* ---------- Cards ---------- */
@@ -328,7 +378,7 @@ a:hover {
 }
 .alert-success {
   background: var(--low-tint);
-  color: #0a7a58;
+  color: var(--low);
   border: 1px solid var(--low);
 }
 .alert-info {

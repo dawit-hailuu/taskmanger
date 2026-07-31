@@ -74,7 +74,7 @@ import { ApiClientError } from '../../../core/models/api-error';
               <input type="checkbox" formControlName="rememberMe" />
               Remember me
             </label>
-            <a routerLink="/forgot-password">Forgot password?</a>
+            <a routerLink="/forgot-password">Reset password?</a>
           </div>
 
           <button type="submit" class="btn btn-primary btn-block" [disabled]="loading()">

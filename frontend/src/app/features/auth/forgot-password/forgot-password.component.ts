@@ -17,7 +17,7 @@ import { ApiClientError } from '../../../core/models/api-error';
             <span class="tick tick-med"></span>
             <span class="tick tick-low"></span>
           </span>
-          <h1>Forgot password</h1>
+          <h1>Reset password</h1>
           <p class="sub">We'll email you a link to reset it.</p>
         </div>
 

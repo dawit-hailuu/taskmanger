@@ -2,6 +2,7 @@ import { Component, OnInit, computed, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 import { ProfileService } from '../../core/services/profile.service';
+import { ThemeService } from '../../core/services/theme.service';
 
 @Component({
   selector: 'app-navbar',
@@ -39,6 +40,20 @@ import { ProfileService } from '../../core/services/profile.service';
                 <span class="avatar" aria-hidden="true">{{ initial(u.name) }}</span>
               }
             </a>
+            <button
+              type="button"
+              class="btn btn-ghost btn-icon"
+              (click)="theme.toggle()"
+              [attr.aria-label]="theme.theme() === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
+              [attr.aria-pressed]="theme.theme() === 'dark'"
+              title="Toggle dark mode"
+            >
+              @if (theme.theme() === 'dark') {
+                <span aria-hidden="true">☀️</span>
+              } @else {
+                <span aria-hidden="true">🌙</span>
+              }
+            </button>
             <button type="button" class="btn btn-ghost" (click)="logout()">
               Sign out
             </button>
@@ -180,6 +195,7 @@ import { ProfileService } from '../../core/services/profile.service';
 export class NavbarComponent implements OnInit {
   private readonly auth = inject(AuthService);
   private readonly profileService = inject(ProfileService);
+  readonly theme = inject(ThemeService);
 
   readonly user = this.auth.user;
   readonly avatarUrl = computed(() => this.profileService.profile()?.avatarUrl ?? null);
