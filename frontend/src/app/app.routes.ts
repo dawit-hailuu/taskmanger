@@ -44,6 +44,15 @@ export const routes: Routes = [
       ),
   },
   {
+    // Must match the GitHub OAuth App's "Authorization callback URL" exactly.
+    path: 'auth/github/callback',
+    canActivate: [guestGuard],
+    loadComponent: () =>
+      import('./features/auth/github-callback/github-callback.component').then(
+        (m) => m.GithubCallbackComponent
+      ),
+  },
+  {
     path: 'dashboard',
     canActivate: [authGuard],
     loadComponent: () =>
@@ -82,6 +91,16 @@ export const routes: Routes = [
       import('./features/projects/project-detail.component').then(
         (m) => m.ProjectDetailComponent
       ),
+  },
+  {
+    /*
+     * Listed before 'tasks/:id' so the literal segment always wins. Every route
+     * here is lazily loaded, so a page's code only ships when it's first visited.
+     */
+    path: 'tasks',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/tasks/tasks.component').then((m) => m.TasksComponent),
   },
   {
     path: 'tasks/:id',

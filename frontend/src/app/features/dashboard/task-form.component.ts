@@ -1,4 +1,5 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   HostListener,
   OnInit,
@@ -23,17 +24,19 @@ import {
 @Component({
   selector: 'app-task-form',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [ReactiveFormsModule],
   template: `
-    <div class="overlay" (click)="onCancel()">
+    <div class="modal-overlay" (click)="onCancel()">
       <section
-        class="dialog card"
+        class="modal-panel dialog card"
         role="dialog"
         aria-modal="true"
+        aria-labelledby="task-form-title"
         (click)="$event.stopPropagation()"
       >
         <header class="dialog-head">
-          <h2>{{ isEdit() ? 'Edit task' : 'New task' }}</h2>
+          <h2 id="task-form-title">{{ isEdit() ? 'Edit task' : 'New task' }}</h2>
           <button
             type="button"
             class="btn btn-ghost btn-icon"
@@ -90,14 +93,29 @@ import {
             </div>
           </div>
 
-          <div class="field">
-            <label class="label" for="dueDate">Due date</label>
-            <input
-              id="dueDate"
-              type="date"
-              class="input"
-              formControlName="dueDate"
-            />
+          <div class="row">
+            <div class="field">
+              <label class="label" for="dueDate">Due date</label>
+              <input id="dueDate" type="date" class="input" formControlName="dueDate" />
+            </div>
+
+            <div class="field">
+              <label class="label" for="weight">Weight</label>
+              <input
+                id="weight"
+                type="number"
+                min="1"
+                class="input"
+                formControlName="weight"
+                placeholder="100"
+              />
+              <!-- Weight is what drives weighted progress, so it's worth one line
+                   of explanation right where it's entered. -->
+              <span class="hint">
+                How much this task counts towards its parent's progress. Subtasks
+                must fit inside it.
+              </span>
+            </div>
           </div>
 
           <footer class="dialog-foot">
@@ -114,25 +132,10 @@ import {
   `,
   styles: [
     `
-      .overlay {
-        position: fixed;
-        inset: 0;
-        background: rgba(17, 22, 34, 0.5);
-        backdrop-filter: blur(2px);
-        display: flex;
-        align-items: flex-start;
-        justify-content: center;
-        padding: 4rem 1.25rem 2rem;
-        z-index: 50;
-        overflow-y: auto;
-        animation: fade 0.15s ease;
-      }
-
+      /* Overlay + panel sizing/animation come from the shared .modal-* classes
+         in styles.css, so every dialog behaves identically. */
       .dialog {
-        width: 100%;
-        max-width: 520px;
         padding: 1.5rem 1.6rem 1.6rem;
-        animation: rise 0.18s ease;
       }
 
       .dialog-head {
@@ -156,6 +159,12 @@ import {
         gap: 1rem;
       }
 
+      .hint {
+        font-size: 0.74rem;
+        line-height: 1.4;
+        color: var(--muted);
+      }
+
       .dialog-foot {
         display: flex;
         justify-content: flex-end;
@@ -163,23 +172,19 @@ import {
         margin-top: 0.6rem;
       }
 
-      @media (max-width: 480px) {
+      @media (max-width: 560px) {
+        .dialog {
+          padding: 1.25rem 1.1rem 1.4rem;
+        }
         .row {
           grid-template-columns: 1fr;
         }
-        .overlay {
-          padding-top: 2rem;
+        .dialog-foot {
+          flex-direction: column-reverse;
         }
-      }
-
-      @keyframes fade {
-        from { opacity: 0; }
-        to { opacity: 1; }
-      }
-
-      @keyframes rise {
-        from { opacity: 0; transform: translateY(8px); }
-        to { opacity: 1; transform: translateY(0); }
+        .dialog-foot .btn {
+          width: 100%;
+        }
       }
     `,
   ],
@@ -190,6 +195,10 @@ export class TaskFormComponent implements OnInit {
   readonly task = input<Task | null>(null);
   /** When set, new tasks created from this form are attached to this project. */
   readonly projectId = input<number | null>(null);
+  /** When set, the new task is created as a subtask of this task. */
+  readonly parentId = input<number | null>(null);
+  /** When set (creating only), seeds the status field — e.g. "+ Add" inside a status group. */
+  readonly presetStatus = input<TaskStatus | null>(null);
   readonly saved = output<TaskRequest>();
   readonly cancelled = output<void>();
 
@@ -205,6 +214,9 @@ export class TaskFormComponent implements OnInit {
     priority: ['MEDIUM' as Priority, [Validators.required]],
     status: ['TODO' as TaskStatus, [Validators.required]],
     dueDate: [''],
+    // Blank means "let the server decide": the parent's remaining budget for a
+    // subtask, or the default for a top-level task.
+    weight: ['' as string | number],
   });
 
   ngOnInit(): void {
@@ -217,7 +229,10 @@ export class TaskFormComponent implements OnInit {
         priority: existing.priority,
         status: existing.status,
         dueDate: existing.dueDate ?? '',
+        weight: existing.weight,
       });
+    } else if (this.presetStatus()) {
+      this.form.patchValue({ status: this.presetStatus()! });
     }
   }
 
@@ -242,6 +257,8 @@ export class TaskFormComponent implements OnInit {
 
     const raw = this.form.getRawValue();
     const existing = this.task();
+    const weight = Number.parseInt(String(raw.weight), 10);
+
     const payload: TaskRequest = {
       title: raw.title.trim(),
       description: raw.description.trim() ? raw.description.trim() : null,
@@ -249,6 +266,10 @@ export class TaskFormComponent implements OnInit {
       status: raw.status,
       dueDate: raw.dueDate ? raw.dueDate : null,
       projectId: existing ? existing.projectId : this.projectId(),
+      // Omitted rather than sent as null, so the server keeps the current weight
+      // on edit and picks a sensible default on create.
+      weight: Number.isFinite(weight) && weight > 0 ? weight : undefined,
+      parentId: existing ? undefined : this.parentId(),
     };
     this.saved.emit(payload);
   }

@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { ApiClientError } from '../../../core/models/api-error';
@@ -8,6 +8,7 @@ type State = 'verifying' | 'success' | 'error';
 @Component({
   selector: 'app-verify-email',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink],
   template: `
     <main class="auth">

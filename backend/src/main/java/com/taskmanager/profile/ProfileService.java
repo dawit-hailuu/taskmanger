@@ -46,8 +46,18 @@ public class ProfileService {
     /** Creates the default profile + notification preference rows for a newly registered user. */
     @Transactional
     public void createDefaults(User user) {
+        createDefaults(user, null);
+    }
+
+    /**
+     * Same as {@link #createDefaults(User)}, but seeds the avatar — used when an
+     * identity provider (e.g. Google) already gives us a profile picture URL.
+     */
+    @Transactional
+    public void createDefaults(User user, String avatarUrl) {
         UserProfile profile = new UserProfile();
         profile.setUser(user);
+        profile.setAvatarUrl(blankToNull(avatarUrl));
         profileRepository.save(profile);
 
         NotificationPreference preference = new NotificationPreference();

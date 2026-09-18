@@ -65,6 +65,49 @@ app:
     # The "From" address. For Gmail this must equal the authenticated account,
     # so it defaults to MAIL_USERNAME.
     from: ${APP_MAIL_FROM:${MAIL_USERNAME:no-reply@taskflow.local}}
+  oauth2:
+    google:
+      # OAuth 2.0 Web-application Client ID from Google Cloud Console
+      # (APIs & Services → Credentials). Add your frontend origin to
+      # "Authorised JavaScript origins", e.g. http://localhost:4200.
+      #
+      # Leave EMPTY to disable Google Sign-In: /api/auth/config then reports
+      # it as unavailable and the frontend hides the button. Email/password
+      # login is unaffected either way.
+      client-id: ${APP_GOOGLE_CLIENT_ID:}
+      # Same Cloud Console client, "Web application" type — it always has a
+      # secret even though the plain ID-token flow below never needs it. Only
+      # required for the custom-button popup flow (GoogleOAuthClient), which
+      # exchanges a code for tokens server-side. Leave empty to keep that
+      # button hidden even if client-id is set.
+      client-secret: ${APP_GOOGLE_CLIENT_SECRET:}
+      # Google's published signing keys. Overridable for tests only.
+      jwk-set-uri: ${APP_GOOGLE_JWK_SET_URI:https://www.googleapis.com/oauth2/v3/certs}
+    github:
+      # OAuth App Client ID/Secret from GitHub → Settings → Developer settings →
+      # OAuth Apps. Authorization callback URL must be
+      # "<your frontend origin>/auth/github/callback", e.g.
+      # http://localhost:4200/auth/github/callback.
+      #
+      # Leave EITHER empty to disable GitHub Sign-In: /api/auth/config then
+      # reports it as unavailable and the frontend hides the button.
+      # Email/password login is unaffected either way.
+      client-id: ${APP_GITHUB_CLIENT_ID:}
+      # Never logged, never returned to the frontend — only used server-side to
+      # exchange an authorization code for an access token.
+      client-secret: ${APP_GITHUB_CLIENT_SECRET:}
+    apple:
+      # Scaffolding only — Sign in with Apple is not implemented yet, so these
+      # are never read by any bean. Left here so the eventual implementation has
+      # an obvious, already-agreed-upon place to read from, and so
+      # AuthConfigResponse.appleEnabled has a clear path to becoming real:
+      # a Services ID (client id), the Team ID and Key ID from the Apple
+      # Developer portal, and the .p8 private key used to sign the client
+      # secret JWT that Sign in with Apple's token exchange requires.
+      client-id: ${APP_APPLE_CLIENT_ID:}
+      team-id: ${APP_APPLE_TEAM_ID:}
+      key-id: ${APP_APPLE_KEY_ID:}
+      private-key: ${APP_APPLE_PRIVATE_KEY:}
   rate-limit:
     # Fixed-window limiter for sensitive auth endpoints.
     auth:

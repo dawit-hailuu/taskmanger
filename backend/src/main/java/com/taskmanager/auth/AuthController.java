@@ -1,12 +1,18 @@
 package com.taskmanager.auth;
 
+import com.taskmanager.auth.dto.AuthConfigResponse;
 import com.taskmanager.auth.dto.AuthResponse;
 import com.taskmanager.auth.dto.EmailRequest;
+import com.taskmanager.auth.dto.GithubLoginRequest;
+import com.taskmanager.auth.dto.GoogleCodeLoginRequest;
+import com.taskmanager.auth.dto.GoogleLoginRequest;
 import com.taskmanager.auth.dto.LoginRequest;
 import com.taskmanager.auth.dto.MessageResponse;
 import com.taskmanager.auth.dto.RefreshRequest;
 import com.taskmanager.auth.dto.RegisterRequest;
 import com.taskmanager.auth.dto.ResetPasswordRequest;
+import com.taskmanager.auth.github.GithubOAuthClient;
+import com.taskmanager.auth.google.GoogleOAuthClient;
 import com.taskmanager.auth.service.EmailVerificationService;
 import com.taskmanager.auth.service.PasswordResetService;
 import com.taskmanager.auth.support.ClientInfo;
@@ -34,13 +40,32 @@ public class AuthController {
     private final AuthService authService;
     private final EmailVerificationService emailVerificationService;
     private final PasswordResetService passwordResetService;
+    private final GoogleOAuthClient googleOAuthClient;
+    private final GithubOAuthClient githubOAuthClient;
 
     public AuthController(AuthService authService,
                           EmailVerificationService emailVerificationService,
-                          PasswordResetService passwordResetService) {
+                          PasswordResetService passwordResetService,
+                          GoogleOAuthClient googleOAuthClient,
+                          GithubOAuthClient githubOAuthClient) {
         this.authService = authService;
         this.emailVerificationService = emailVerificationService;
         this.passwordResetService = passwordResetService;
+        this.googleOAuthClient = googleOAuthClient;
+        this.githubOAuthClient = githubOAuthClient;
+    }
+
+    @Operation(summary = "Which sign-in methods this deployment offers (public)")
+    @GetMapping("/config")
+    public ResponseEntity<AuthConfigResponse> config() {
+        return ResponseEntity.ok(new AuthConfigResponse(
+                // Gated on the custom-button popup flow (GoogleOAuthClient), which is what
+                // the frontend actually renders a button for — not the older direct
+                // ID-token endpoint below, which stays reachable but unused by the UI.
+                googleOAuthClient.isEnabled(), googleOAuthClient.clientId(),
+                githubOAuthClient.isEnabled(), githubOAuthClient.clientId(),
+                // Sign in with Apple isn't implemented yet — always false until it is.
+                false));
     }
 
     @Operation(summary = "Register a new account and send a verification email")
@@ -56,6 +81,34 @@ public class AuthController {
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request,
                                               HttpServletRequest http) {
         return ResponseEntity.ok(authService.login(request, ClientInfo.from(http)));
+    }
+
+    @Operation(summary = "Continue with Google — verifies a Google ID token directly, then signs "
+            + "in or provisions the matching account and returns the usual token pair. Kept for "
+            + "API completeness (e.g. a native client with its own ID token); the web frontend "
+            + "uses /google/code instead")
+    @PostMapping("/google")
+    public ResponseEntity<AuthResponse> loginWithGoogle(@Valid @RequestBody GoogleLoginRequest request,
+                                                        HttpServletRequest http) {
+        return ResponseEntity.ok(authService.loginWithGoogle(request, ClientInfo.from(http)));
+    }
+
+    @Operation(summary = "Continue with Google (custom button) — exchanges an authorization "
+            + "code obtained via Google's popup flow for the ID token it belongs to, then signs "
+            + "in or provisions the matching account and returns the usual token pair")
+    @PostMapping("/google/code")
+    public ResponseEntity<AuthResponse> loginWithGoogleCode(@Valid @RequestBody GoogleCodeLoginRequest request,
+                                                            HttpServletRequest http) {
+        return ResponseEntity.ok(authService.loginWithGoogleCode(request, ClientInfo.from(http)));
+    }
+
+    @Operation(summary = "Continue with GitHub — exchanges an authorization code for the "
+            + "account it belongs to, then signs in or provisions the matching account "
+            + "and returns the usual token pair")
+    @PostMapping("/github")
+    public ResponseEntity<AuthResponse> loginWithGithub(@Valid @RequestBody GithubLoginRequest request,
+                                                        HttpServletRequest http) {
+        return ResponseEntity.ok(authService.loginWithGithub(request, ClientInfo.from(http)));
     }
 
     @Operation(summary = "Exchange a refresh token for a new token pair (rotates the refresh token)")

@@ -28,6 +28,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     /** Endpoints where brute-force / spam protection matters most. */
     private static final Set<String> LIMITED_PATHS = Set.of(
             "/api/auth/login",
+            "/api/auth/google",
             "/api/auth/register",
             "/api/auth/forgot-password",
             "/api/auth/reset-password",

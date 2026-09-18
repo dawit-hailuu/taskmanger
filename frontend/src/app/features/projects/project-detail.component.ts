@@ -1,8 +1,10 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ProjectService } from '../../core/services/project.service';
 import { TaskService } from '../../core/services/task.service';
+import { ConfirmService } from '../../core/services/confirm.service';
+import { ToastService } from '../../core/services/toast.service';
 import {
   Project,
   ProjectMember,
@@ -17,6 +19,7 @@ import { TaskFormComponent } from '../dashboard/task-form.component';
 @Component({
   selector: 'app-project-detail',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [ReactiveFormsModule, RouterLink, TaskFormComponent],
   template: `
     <main class="container page">
@@ -346,6 +349,8 @@ export class ProjectDetailComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly route = inject(ActivatedRoute);
   private readonly projectService = inject(ProjectService);
+  private readonly confirm = inject(ConfirmService);
+  private readonly toast = inject(ToastService);
   private readonly taskService = inject(TaskService);
 
   private projectId!: number;
@@ -503,17 +508,26 @@ export class ProjectDetailComponent implements OnInit {
   }
 
   removeMember(member: ProjectMember): void {
-    const confirmed = confirm(`Remove ${member.name} from this project?`);
-    if (!confirmed) {
-      return;
-    }
-    this.projectService.removeMember(this.projectId, member.userId).subscribe({
-      next: () => {
-        this.members.set(this.members().filter((m) => m.userId !== member.userId));
-        this.loadProject();
-      },
-      error: (err: ApiClientError) => this.error.set(err.message),
-    });
+    this.confirm
+      .ask({
+        title: 'Remove member?',
+        message: `${member.name} will lose access to this project and its tasks.`,
+        confirmLabel: 'Remove',
+        danger: true,
+      })
+      .subscribe((confirmed) => {
+        if (!confirmed) {
+          return;
+        }
+        this.projectService.removeMember(this.projectId, member.userId).subscribe({
+          next: () => {
+            this.members.set(this.members().filter((m) => m.userId !== member.userId));
+            this.loadProject();
+            this.toast.success(`Removed ${member.name} from the project.`);
+          },
+          error: (err: ApiClientError) => this.toast.error(err.message),
+        });
+      });
   }
 
   changeRole(member: ProjectMember, role: ProjectRole): void {

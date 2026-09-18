@@ -1,13 +1,25 @@
-import { Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { ApiClientError } from '../../../core/models/api-error';
+import { GoogleAuthService } from '../../../core/services/google-auth.service';
+import { AppleSignInComponent } from '../../../shared/auth/apple-sign-in.component';
+import { GithubSignInComponent } from '../../../shared/auth/github-sign-in.component';
+import { GoogleSignInComponent } from '../../../shared/auth/google-sign-in.component';
 
 @Component({
   selector: 'app-register',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [
+    ReactiveFormsModule,
+    RouterLink,
+    GoogleSignInComponent,
+    GithubSignInComponent,
+    AppleSignInComponent,
+  ],
   template: `
     <main class="auth">
       <section class="auth-card card">
@@ -41,6 +53,22 @@ import { ApiClientError } from '../../../core/models/api-error';
         } @else {
           @if (error()) {
             <div class="alert alert-error" role="alert">{{ error() }}</div>
+          }
+
+          <!-- Signing up with a social provider creates the account and signs the
+               user in in one step: the provider has already proved the email, so
+               there's no verification round-trip to wait for. -->
+          <div class="social-stack">
+            <app-google-sign-in
+              [hideDivider]="true"
+              (failedToSignIn)="error.set($event)"
+            />
+            <app-github-sign-in />
+            <app-apple-sign-in />
+          </div>
+
+          @if (anySocialEnabled()) {
+            <div class="divider"><span>or sign up with email</span></div>
           }
 
           <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
@@ -85,6 +113,14 @@ import { ApiClientError } from '../../../core/models/api-error';
 export class RegisterComponent {
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
+  private readonly googleAuth = inject(GoogleAuthService);
+  private readonly providersConfig = toSignal(this.googleAuth.providers(), { initialValue: null });
+
+  /** Whether to show the "or sign up with email" divider — only once at least one social button renders. */
+  readonly anySocialEnabled = computed(() => {
+    const config = this.providersConfig();
+    return !!config && (config.googleEnabled || config.githubEnabled || config.appleEnabled);
+  });
 
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);

@@ -48,6 +48,14 @@
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
 
+        <!-- JOSE/JWT support for verifying third-party ID tokens (Google Sign-In).
+             Gives us NimbusJwtDecoder + JWKS key rotation handling; we keep issuing
+             our own jjwt-based access tokens, so this is verification only. -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-jose</artifactId>
+        </dependency>
+
         <!-- Mail (JavaMailSender). Only used by the SMTP mail provider;
              the default 'log' provider needs no SMTP server. -->
         <dependency>

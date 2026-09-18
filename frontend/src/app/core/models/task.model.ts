@@ -25,8 +25,50 @@ export interface Task {
   projectName: string | null;
   ownerId: number;
   ownerName: string;
+  /** Parent task, or null for a top-level task. */
+  parentId: number | null;
+  /** This task's share of its parent's effort. */
+  weight: number;
+  /** Weighted completion 0..100 — derived from weights, never from a count. */
+  progress: number;
+  /** Distance from the root; drives indentation in the tree view. */
+  depth: number;
+  /** Ordering among siblings. */
+  position: number;
+  /** Direct children, or null when the server wasn't asked to count them. */
+  childCount: number | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * One node of the task tree. Recursive by construction, which is what allows
+ * unlimited nesting — there is no fixed "subtask" level anywhere.
+ */
+export interface TaskNode {
+  id: number;
+  title: string;
+  description: string | null;
+  priority: Priority;
+  status: TaskStatus;
+  startDate: string | null;
+  dueDate: string | null;
+  parentId: number | null;
+  weight: number;
+  progress: number;
+  depth: number;
+  position: number;
+  /** How much of this node's weight its children already claim. */
+  allocatedChildWeight: number;
+  /** How much is still free for a new child. */
+  availableChildWeight: number;
+  projectId: number | null;
+  projectName: string | null;
+  ownerId: number;
+  ownerName: string;
+  createdAt: string;
+  updatedAt: string;
+  children: TaskNode[];
 }
 
 /** Payload sent when creating or updating a task. */
@@ -42,17 +84,83 @@ export interface TaskRequest {
   recurrence?: RecurrenceType;
   recurrenceEndDate?: string | null;
   projectId: number | null;
+  /** Nest the new task under this parent. Omit for a top-level task. */
+  parentId?: number | null;
+  /** Omit to let the server allocate whatever the parent has left. */
+  weight?: number | null;
 }
 
-/** Query options for listing tasks. */
+/** Payload for adding a child at any depth in the tree. */
+export interface CreateChildTaskRequest {
+  title: string;
+  description?: string | null;
+  weight?: number | null;
+  priority?: Priority | null;
+  dueDate?: string | null;
+}
+
+/** Payload for drag & drop: re-parent and/or reorder. */
+export interface MoveTaskRequest {
+  parentId: number | null;
+  position?: number | null;
+}
+
+/** Query options for listing tasks. Combines with pagination server-side. */
 export interface TaskQuery {
   search?: string;
   status?: TaskStatus | '';
   priority?: Priority | '';
+  projectId?: number | null;
+  parentId?: number | null;
+  /** Only top-level tasks — the default for the board and tree views. */
+  rootsOnly?: boolean;
+  dueFrom?: string | null;
+  dueTo?: string | null;
+  overdueOnly?: boolean;
   page?: number;
   size?: number;
   sortBy?: string;
   direction?: 'asc' | 'desc';
+}
+
+/** Headline dashboard numbers, all computed server-side. */
+export interface TaskStats {
+  total: number;
+  rootTotal: number;
+  byStatus: Record<TaskStatus, number>;
+  openByPriority: Record<Priority, number>;
+  open: number;
+  completed: number;
+  overdue: number;
+  dueToday: number;
+  dueThisWeek: number;
+  completionRate: number;
+  averageProgress: number;
+}
+
+export interface CompletionPoint {
+  date: string;
+  completed: number;
+}
+
+export interface ActivityEntry {
+  id: number;
+  taskId: number;
+  taskTitle: string;
+  summary: string;
+  actorName: string;
+  createdAt: string;
+}
+
+/** The whole dashboard in one payload — one request instead of a dozen. */
+export interface DashboardSummary {
+  stats: TaskStats;
+  dueToday: Task[];
+  upcoming: Task[];
+  overdue: Task[];
+  recent: Task[];
+  completionTrend: CompletionPoint[];
+  activity: ActivityEntry[];
 }
 
 /** Matches the backend PageResponse envelope. */
@@ -111,6 +219,11 @@ export interface TaskCollaborator {
   addedAt: string;
 }
 
+/**
+ * Legacy flat checklist item. Subtasks are now ordinary child tasks (see
+ * {@link TaskNode}); this shape is only what the older
+ * `/tasks/{id}/subtasks` endpoints still return.
+ */
 export interface Subtask {
   id: number;
   title: string;

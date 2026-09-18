@@ -29,9 +29,22 @@ public class User implements UserDetails {
     @Column(nullable = false, unique = true, length = 150)
     private String email;
 
-    /** BCrypt-hashed password. Never exposed via API responses. */
-    @Column(nullable = false)
+    /**
+     * BCrypt-hashed password. Never exposed via API responses.
+     * {@code null} for accounts owned by an external identity provider
+     * (see {@link #authProvider}) — those never have a local credential.
+     */
+    @Column
     private String password;
+
+    /** Which identity provider authenticates this account. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "auth_provider", nullable = false, length = 20)
+    private AuthProvider authProvider = AuthProvider.LOCAL;
+
+    /** Stable subject id at the external provider ({@code null} for LOCAL). */
+    @Column(name = "provider_id", length = 128)
+    private String providerId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -50,11 +63,22 @@ public class User implements UserDetails {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    /** Set on every successful sign-in (local, Google, or GitHub) — see AuthService.issueSession. Null until then. */
+    @Column(name = "last_login_at")
+    private Instant lastLoginAt;
+
     public User() {
     }
 
     public User(Long id, String name, String email, String password, Role role,
                 AccountStatus accountStatus, boolean emailVerified, Instant createdAt) {
+        this(id, name, email, password, role, accountStatus, emailVerified, createdAt,
+                AuthProvider.LOCAL, null);
+    }
+
+    public User(Long id, String name, String email, String password, Role role,
+                AccountStatus accountStatus, boolean emailVerified, Instant createdAt,
+                AuthProvider authProvider, String providerId) {
         this.id = id;
         this.name = name;
         this.email = email;
@@ -63,6 +87,8 @@ public class User implements UserDetails {
         this.accountStatus = (accountStatus != null) ? accountStatus : AccountStatus.PENDING;
         this.emailVerified = emailVerified;
         this.createdAt = createdAt;
+        this.authProvider = (authProvider != null) ? authProvider : AuthProvider.LOCAL;
+        this.providerId = providerId;
     }
 
     public static Builder builder() {
@@ -78,6 +104,8 @@ public class User implements UserDetails {
         private AccountStatus accountStatus = AccountStatus.PENDING;
         private boolean emailVerified = false;
         private Instant createdAt;
+        private AuthProvider authProvider = AuthProvider.LOCAL;
+        private String providerId;
 
         public Builder id(Long id) { this.id = id; return this; }
         public Builder name(String name) { this.name = name; return this; }
@@ -87,9 +115,12 @@ public class User implements UserDetails {
         public Builder accountStatus(AccountStatus accountStatus) { this.accountStatus = accountStatus; return this; }
         public Builder emailVerified(boolean emailVerified) { this.emailVerified = emailVerified; return this; }
         public Builder createdAt(Instant createdAt) { this.createdAt = createdAt; return this; }
+        public Builder authProvider(AuthProvider authProvider) { this.authProvider = authProvider; return this; }
+        public Builder providerId(String providerId) { this.providerId = providerId; return this; }
 
         public User build() {
-            return new User(id, name, email, password, role, accountStatus, emailVerified, createdAt);
+            return new User(id, name, email, password, role, accountStatus, emailVerified, createdAt,
+                    authProvider, providerId);
         }
     }
 
@@ -117,6 +148,20 @@ public class User implements UserDetails {
 
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+
+    public Instant getLastLoginAt() { return lastLoginAt; }
+    public void setLastLoginAt(Instant lastLoginAt) { this.lastLoginAt = lastLoginAt; }
+
+    public AuthProvider getAuthProvider() { return authProvider; }
+    public void setAuthProvider(AuthProvider authProvider) { this.authProvider = authProvider; }
+
+    public String getProviderId() { return providerId; }
+    public void setProviderId(String providerId) { this.providerId = providerId; }
+
+    /** True when this account can sign in with an email + password. */
+    public boolean hasLocalPassword() {
+        return authProvider == AuthProvider.LOCAL && password != null;
+    }
 
     // ----- UserDetails contract -----
 

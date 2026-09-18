@@ -5,6 +5,9 @@ import { Observable, finalize, of, shareReplay, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
   AuthResponse,
+  GithubLoginRequest,
+  GoogleCodeLoginRequest,
+  GoogleLoginRequest,
   LoginRequest,
   MessageResponse,
   RegisterRequest,
@@ -38,6 +41,36 @@ export class AuthService {
   login(credentials: LoginRequest): Observable<AuthResponse> {
     return this.http
       .post<AuthResponse>(`${this.authUrl}/login`, credentials)
+      .pipe(tap((res) => this.storeSession(res)));
+  }
+
+  /**
+   * "Continue with Google" via a direct ID token. Not currently called by this
+   * app's UI (see {@link loginWithGoogleCode}) — kept alongside the backend
+   * endpoint it talks to for API completeness.
+   */
+  loginWithGoogle(payload: GoogleLoginRequest): Observable<AuthResponse> {
+    return this.http
+      .post<AuthResponse>(`${this.authUrl}/google`, payload)
+      .pipe(tap((res) => this.storeSession(res)));
+  }
+
+  /**
+   * "Continue with Google" via the custom-button popup flow — what the sign-in
+   * and sign-up pages actually call. Ends in exactly the same stored session as
+   * password login — same access token, same refresh token — so nothing
+   * downstream needs to know how the user signed in.
+   */
+  loginWithGoogleCode(payload: GoogleCodeLoginRequest): Observable<AuthResponse> {
+    return this.http
+      .post<AuthResponse>(`${this.authUrl}/google/code`, payload)
+      .pipe(tap((res) => this.storeSession(res)));
+  }
+
+  /** "Continue with GitHub" — same session-establishing contract as {@link loginWithGoogleCode}. */
+  loginWithGithub(payload: GithubLoginRequest): Observable<AuthResponse> {
+    return this.http
+      .post<AuthResponse>(`${this.authUrl}/github`, payload)
       .pipe(tap((res) => this.storeSession(res)));
   }
 

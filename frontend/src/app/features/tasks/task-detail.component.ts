@@ -1,11 +1,24 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  OnInit,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { TaskTreeComponent } from '../../shared/task-tree/task-tree.component';
+import { ProgressBarComponent } from '../../shared/ui/progress-bar.component';
+import { SkeletonComponent } from '../../shared/ui/skeleton.component';
+import { VirtualListComponent } from '../../shared/ui/virtual-list.component';
 import { AuthService } from '../../core/services/auth.service';
 import { TaskService } from '../../core/services/task.service';
 import { TaskDetailService } from '../../core/services/task-detail.service';
 import { ProjectService } from '../../core/services/project.service';
 import { TagService } from '../../core/services/tag.service';
+import { ConfirmService } from '../../core/services/confirm.service';
+import { ToastService } from '../../core/services/toast.service';
 import { ApiClientError } from '../../core/models/api-error';
 import { ProjectMember } from '../../core/models/project.model';
 import {
@@ -17,7 +30,6 @@ import {
   RecurrenceType,
   STATUS_LABELS,
   STATUS_OPTIONS,
-  Subtask,
   TagRef,
   Task,
   TaskAttachment,
@@ -25,13 +37,22 @@ import {
   TaskComment,
   TaskDependencies,
   TaskHistoryEntry,
+  TaskNode,
   TaskStatus,
 } from '../../core/models/task.model';
 
 @Component({
   selector: 'app-task-detail',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [
+    ReactiveFormsModule,
+    RouterLink,
+    TaskTreeComponent,
+    ProgressBarComponent,
+    SkeletonComponent,
+    VirtualListComponent,
+  ],
   template: `
     <main class="container page">
       @if (task(); as t) {
@@ -150,6 +171,16 @@ import {
               }
             </div>
 
+            <!-- Weighted progress, front and centre: it's the number that
+                 actually reflects how much of this task is done. -->
+            <div class="head-progress">
+              <span class="head-progress-label">
+                Weighted progress
+                <span class="muted">· weight {{ t.weight }}</span>
+              </span>
+              <app-progress-bar [value]="t.progress" />
+            </div>
+
             <div class="meta-grid">
               @if (t.startDate) {
                 <span>Starts {{ formatDate(t.startDate) }}</span>
@@ -236,26 +267,65 @@ import {
           }
         </section>
 
-        <!-- Subtasks -->
+        <!-- Subtask tree: unlimited nesting, weights, and weighted progress -->
         <section class="card">
-          <h2>Subtasks @if (subtasks().length) {<span class="muted">({{ completedSubtasks() }}/{{ subtasks().length }})</span>}</h2>
-          <ul class="subtask-list">
-            @for (s of subtasks(); track s.id) {
-              <li>
-                <input
-                  type="checkbox"
-                  [checked]="s.completed"
-                  (change)="toggleSubtask(s, $any($event.target).checked)"
-                />
-                <span [class.done]="s.completed">{{ s.title }}</span>
-                <button type="button" class="chip-x" (click)="deleteSubtask(s)" aria-label="Remove">×</button>
-              </li>
+          <div class="tree-head">
+            <h2>
+              Subtasks
+              @if (subtree(); as root) {
+                <span class="muted">({{ root.children.length }} direct)</span>
+              }
+            </h2>
+            @if (subtree(); as root) {
+              <div class="tree-progress">
+                <span class="tree-budget">
+                  {{ root.allocatedChildWeight }} / {{ root.weight }} weight allocated
+                </span>
+                <app-progress-bar [value]="root.progress" />
+              </div>
             }
-          </ul>
-          <form class="inline-form" (ngSubmit)="addSubtask()" novalidate>
-            <input type="text" class="input" placeholder="Add a subtask…" [formControl]="subtaskTitle" />
-            <button type="submit" class="btn btn-ghost" [disabled]="!subtaskTitle.value.trim()">Add</button>
-          </form>
+          </div>
+
+          @if (treeLoading()) {
+            <app-skeleton variant="row" [repeat]="3" ariaLabel="Loading subtasks" />
+          } @else if (subtree(); as root) {
+            @if (root.children.length === 0) {
+              <p class="muted">
+                No subtasks yet. Add one below — subtasks can be nested to any depth,
+                and this task's progress is the weighted average of theirs.
+              </p>
+            } @else {
+              <app-task-tree
+                [nodes]="root.children"
+                [depthOffset]="root.depth + 1"
+                (changed)="reloadSubtree()"
+                (opened)="openTask($event.id)"
+              />
+            }
+
+            <form class="inline-form" (ngSubmit)="addSubtask()" novalidate>
+              <input
+                type="text"
+                class="input"
+                placeholder="Add a subtask…"
+                [formControl]="subtaskTitle"
+              />
+              <input
+                type="number"
+                class="input weight-field"
+                min="1"
+                [placeholder]="'w ' + (root.availableChildWeight || 1)"
+                [formControl]="subtaskWeight"
+              />
+              <button
+                type="submit"
+                class="btn btn-ghost"
+                [disabled]="!subtaskTitle.value.trim()"
+              >
+                Add
+              </button>
+            </form>
+          }
         </section>
 
         <!-- Dependencies -->
@@ -353,18 +423,32 @@ import {
 
         <!-- History -->
         <section class="card">
-          <h2>History</h2>
-          <ul class="history-list">
-            @for (h of history(); track h.id) {
-              <li>
-                <span class="history-main">{{ h.summary }}</span>
-                <span class="history-meta">{{ h.actorName }} · {{ formatDateTime(h.createdAt) }}</span>
-              </li>
-            }
-            @if (history().length === 0) {
-              <p class="muted">No history yet.</p>
-            }
-          </ul>
+          <h2>History <span class="muted">({{ history().length }})</span></h2>
+          @if (history().length === 0) {
+            <p class="muted">No history yet.</p>
+          } @else {
+            <!--
+              Audit trails only ever grow, so this list is virtualised: rows are
+              a fixed height and only the ones in view exist in the DOM. It also
+              bounds the section's height instead of letting a busy task push
+              every other panel off the page.
+            -->
+            <app-virtual-list
+              class="history-scroll"
+              [items]="history()"
+              [itemHeight]="46"
+              [viewportHeight]="historyViewportHeight()"
+            >
+              <ng-template let-entry>
+                <div class="history-row">
+                  <span class="history-main">{{ entry.summary }}</span>
+                  <span class="history-meta">
+                    {{ entry.actorName }} · {{ formatDateTime(entry.createdAt) }}
+                  </span>
+                </div>
+              </ng-template>
+            </app-virtual-list>
+          }
         </section>
       } @else if (loading()) {
         <div class="state">Loading task…</div>
@@ -534,7 +618,6 @@ import {
         font-size: 0.8rem;
       }
 
-      .subtask-list,
       .attachment-list,
       .history-list {
         list-style: none;
@@ -545,7 +628,6 @@ import {
         gap: 0.5rem;
       }
 
-      .subtask-list li,
       .attachment-list li {
         display: flex;
         align-items: center;
@@ -553,30 +635,64 @@ import {
         font-size: 0.88rem;
       }
 
-      .subtask-list input[type='checkbox'] {
-        width: 16px;
-        height: 16px;
-        accent-color: var(--brand);
+      /* ---- weighted progress ---- */
+      .head-progress {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        margin: 1rem 0 0.2rem;
+        max-width: 420px;
       }
 
-      .subtask-list span {
-        flex: 1;
+      .head-progress-label {
+        font-size: 0.74rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--faint);
       }
 
-      .subtask-list .done {
-        text-decoration: line-through;
+      /* ---- subtask tree ---- */
+      .tree-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-bottom: 0.75rem;
+      }
+
+      .tree-progress {
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+        flex: 1 1 220px;
+        max-width: 320px;
+      }
+
+      .tree-budget {
+        font-size: 0.72rem;
         color: var(--muted);
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
       }
 
       .inline-form {
         display: flex;
         gap: 0.6rem;
         align-items: flex-start;
+        margin-top: 0.9rem;
+        flex-wrap: wrap;
       }
 
       .inline-form .input,
       .inline-form .textarea {
         flex: 1;
+        min-width: 0;
+      }
+
+      .inline-form .weight-field {
+        flex: 0 0 6rem;
       }
 
       .dep-col {
@@ -625,6 +741,22 @@ import {
         margin-bottom: 0.6rem;
       }
 
+      /* ---- virtualised history ---- */
+      .history-scroll {
+        display: block;
+        margin: 0 -0.35rem;
+      }
+
+      .history-row {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 0.15rem;
+        height: 100%;
+        padding: 0 0.35rem;
+        border-bottom: 1px solid var(--border);
+      }
+
       .history-list li {
         display: flex;
         justify-content: space-between;
@@ -658,6 +790,8 @@ export class TaskDetailComponent implements OnInit {
   private readonly detailService = inject(TaskDetailService);
   private readonly projectService = inject(ProjectService);
   private readonly tagService = inject(TagService);
+  private readonly confirm = inject(ConfirmService);
+  private readonly toast = inject(ToastService);
 
   private taskId!: number;
 
@@ -678,14 +812,30 @@ export class TaskDetailComponent implements OnInit {
   readonly assignees = signal<TaskCollaborator[]>([]);
   readonly watchers = signal<TaskCollaborator[]>([]);
   readonly taskTags = signal<TagRef[]>([]);
-  readonly subtasks = signal<Subtask[]>([]);
+  /**
+   * This task with its whole descendant tree, fetched in one recursive query.
+   * Replaces the old flat `subtasks` list — nesting is now unlimited, and the
+   * weighted progress of every level comes straight from the server.
+   */
+  readonly subtree = signal<TaskNode | null>(null);
+  readonly treeLoading = signal(true);
   readonly dependencies = signal<TaskDependencies>({ blockedBy: [], blocks: [] });
   readonly comments = signal<TaskComment[]>([]);
   readonly attachments = signal<TaskAttachment[]>([]);
   readonly history = signal<TaskHistoryEntry[]>([]);
+
+  /**
+   * Height of the virtualised history viewport: tall enough to show the recent
+   * entries, capped so a long trail never dominates the page.
+   */
+  readonly historyViewportHeight = computed(() =>
+    Math.min(this.history().length * 46, 322)
+  );
   readonly uploading = signal(false);
 
   readonly subtaskTitle = this.fb.nonNullable.control('');
+  /** Blank means "use whatever weight the parent has left". */
+  readonly subtaskWeight = this.fb.control<number | null>(null);
   readonly commentContent = this.fb.nonNullable.control('');
 
   readonly form = this.fb.nonNullable.group({
@@ -726,13 +876,11 @@ export class TaskDetailComponent implements OnInit {
     return this.allProjectTasks().filter((c) => c.id !== t.id && !blockedIds.has(c.id));
   });
 
-  readonly completedSubtasks = computed(() => this.subtasks().filter((s) => s.completed).length);
-
   ngOnInit(): void {
     this.taskId = Number(this.route.snapshot.paramMap.get('id'));
     this.loadTask();
     this.reloadCollaboration();
-    this.detailService.listSubtasks(this.taskId).subscribe({ next: (s) => this.subtasks.set(s) });
+    this.reloadSubtree();
     this.detailService.listDependencies(this.taskId).subscribe({ next: (d) => this.dependencies.set(d) });
     this.detailService.listComments(this.taskId).subscribe({ next: (c) => this.comments.set(c) });
     this.detailService.listAttachments(this.taskId).subscribe({ next: (a) => this.attachments.set(a) });
@@ -837,19 +985,29 @@ export class TaskDetailComponent implements OnInit {
 
   deleteTask(): void {
     const t = this.task();
-    if (!t || !confirm(`Delete "${t.title}"? This can't be undone.`)) {
+    if (!t) {
       return;
     }
-    this.taskService.delete(t.id).subscribe({
-      next: () => {
-        if (t.projectId) {
-          void this.router.navigate(['/projects', t.projectId]);
-        } else {
-          void this.router.navigate(['/dashboard']);
+
+    const nested = this.subtree()?.children.length ?? 0;
+    const message = nested > 0
+      ? `"${t.title}" and everything nested under it will be deleted. This can't be undone.`
+      : `"${t.title}" will be deleted. This can't be undone.`;
+
+    this.confirm
+      .ask({ title: 'Delete task?', message, confirmLabel: 'Delete', danger: true })
+      .subscribe((confirmed) => {
+        if (!confirmed) {
+          return;
         }
-      },
-      error: (err: ApiClientError) => this.error.set(err.message),
-    });
+        this.taskService.delete(t.id).subscribe({
+          next: () => {
+            this.toast.success(`Deleted "${t.title}".`);
+            void this.router.navigate(t.projectId ? ['/projects', t.projectId] : ['/tasks']);
+          },
+          error: (err: ApiClientError) => this.toast.error(err.message),
+        });
+      });
   }
 
   // ---- assignees ----
@@ -902,35 +1060,58 @@ export class TaskDetailComponent implements OnInit {
     });
   }
 
-  // ---- subtasks ----
+  // ---- subtask tree ----
+
+  /**
+   * Reloads the whole subtree in one request.
+   *
+   * <p>Called after every tree mutation instead of patching locally: weighted
+   * progress cascades to the root, and re-deriving that in the browser would
+   * duplicate the rule that already lives in the backend.
+   */
+  reloadSubtree(): void {
+    this.treeLoading.set(true);
+    this.taskService.subtree(this.taskId).subscribe({
+      next: (root) => {
+        this.subtree.set(root);
+        this.treeLoading.set(false);
+        // The task's own progress moves when a descendant does.
+        this.refreshTaskProgress(root);
+      },
+      error: (err: ApiClientError) => {
+        this.error.set(err.message);
+        this.treeLoading.set(false);
+      },
+    });
+  }
 
   addSubtask(): void {
     const title = this.subtaskTitle.value.trim();
     if (!title) {
       return;
     }
-    this.detailService.createSubtask(this.taskId, title).subscribe({
-      next: (s) => {
-        this.subtasks.set([...this.subtasks(), s]);
-        this.subtaskTitle.setValue('');
-      },
-      error: (err: ApiClientError) => this.error.set(err.message),
-    });
+    this.taskService
+      .addChild(this.taskId, { title, weight: this.subtaskWeight.value })
+      .subscribe({
+        next: () => {
+          this.subtaskTitle.setValue('');
+          this.subtaskWeight.setValue(null);
+          this.reloadSubtree();
+        },
+        error: (err: ApiClientError) => this.error.set(err.message),
+      });
   }
 
-  toggleSubtask(subtask: Subtask, completed: boolean): void {
-    this.detailService.updateSubtask(this.taskId, subtask.id, subtask.title, completed).subscribe({
-      next: (updated) =>
-        this.subtasks.set(this.subtasks().map((s) => (s.id === updated.id ? updated : s))),
-      error: (err: ApiClientError) => this.error.set(err.message),
-    });
+  openTask(id: number): void {
+    void this.router.navigate(['/tasks', id]);
   }
 
-  deleteSubtask(subtask: Subtask): void {
-    this.detailService.deleteSubtask(this.taskId, subtask.id).subscribe({
-      next: () => this.subtasks.set(this.subtasks().filter((s) => s.id !== subtask.id)),
-      error: (err: ApiClientError) => this.error.set(err.message),
-    });
+  /** Keeps the header's status/progress in step with the tree below it. */
+  private refreshTaskProgress(root: TaskNode): void {
+    const current = this.task();
+    if (current && current.progress !== root.progress) {
+      this.task.set({ ...current, progress: root.progress });
+    }
   }
 
   // ---- dependencies ----

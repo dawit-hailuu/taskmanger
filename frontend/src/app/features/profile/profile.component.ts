@@ -1,4 +1,4 @@
-import { Component, ElementRef, OnInit, ViewChild, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, OnInit, ViewChild, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ProfileService } from '../../core/services/profile.service';
 import { COMMON_TIMEZONES, Profile } from '../../core/models/profile.model';
@@ -7,6 +7,7 @@ import { ApiClientError } from '../../core/models/api-error';
 @Component({
   selector: 'app-profile',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [ReactiveFormsModule],
   template: `
     <main class="container page">
